@@ -146,7 +146,7 @@ export default function DashboardLayout({
                              pathname === item.href && "bg-muted text-foreground"
                         )}
                     >
-                        <item.icon className="h-5 w-5" />
+                        <item.icon className="h-5 w-5" key={item.href} />
                         {item.label}
                     </Link>
                 ))}
