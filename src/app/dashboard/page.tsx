@@ -44,8 +44,9 @@ export default function Dashboard() {
 
     return (
         <>
-            <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-5">
                 <StatCard title="Overall Budget" value={data.overallBudget} type="currency" description="Total planned budget" icon="💰" />
+                <StatCard title="Total Income" value={data.totalIncomes} type="currency" description="Sum of all income" icon="📈" />
                 <StatCard title="Total Spent" value={data.totalExpenses} type="currency" description="Sum of all contributions" icon="💸" />
                 <StatCard title="Remaining Budget" value={data.remainingBudget} type="currency" description={data.remainingBudget < 0 ? 'Over budget' : 'Funds available'} icon="📊" isNegative={data.remainingBudget < 0}/>
                 <StatCard title="Members" value={data.members.length} description="Total trip participants" icon="👥" />

@@ -17,7 +17,7 @@ export default function StatCard({ title, value, description, icon, type = 'numb
         <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">{title}</CardTitle>
-                <span className="text-muted-foreground">{icon}</span>
+                <span className="text-muted-foreground text-2xl">{icon}</span>
             </CardHeader>
             <CardContent>
                 <div className={cn("text-2xl font-bold", isNegative && 'text-destructive')}>

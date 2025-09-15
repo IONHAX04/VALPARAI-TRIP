@@ -1,4 +1,5 @@
 
+
 export interface TripDay {
   id: string;
   date: Date;
@@ -21,11 +22,22 @@ export interface Expense {
   timestamp: Date;
 }
 
+export interface Income {
+  id: string;
+  memberId: string;
+  memberName: string;
+  amount: number;
+  purpose: string;
+  timestamp: Date;
+}
+
 export interface DashboardData {
     overallBudget: number;
     totalExpenses: number;
     remainingBudget: number;
+    totalIncomes: number;
     members: Member[];
     expenses: Expense[];
     tripDays: TripDay[];
+    incomes: Income[];
 }

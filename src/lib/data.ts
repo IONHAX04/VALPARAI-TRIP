@@ -10,7 +10,7 @@ import {
   equalTo,
 } from 'firebase/database';
 import { db } from './firebase';
-import type { DashboardData, Member, Expense, TripDay } from '@/lib/types';
+import type { DashboardData, Member, Expense, TripDay, Income } from '@/lib/types';
 
 // Helper function to transform snapshot data from Realtime DB
 const snapshotToArray = (snapshot: any) => {
@@ -112,38 +112,78 @@ export const deleteExpense = async (id: string) => {
     await remove(docRef);
 };
 
+// Income Functions
+export const getIncomes = async (): Promise<Income[]> => {
+    const incomesRef = ref(db, 'incomes');
+    const q = query(incomesRef, orderByChild('timestamp'));
+    const snapshot = await get(q);
+    const data = snapshotToArray(snapshot);
+    // Realtime DB sorts ascending, so we reverse for descending order
+    return data.map(d => ({ ...d, timestamp: new Date(d.timestamp) })).reverse() as Income[];
+};
+
+export const addIncome = async (income: Omit<Income, 'id'|'timestamp'>) => {
+    const incomesRef = ref(db, 'incomes');
+    const newIncomeRef = push(incomesRef);
+    await set(newIncomeRef, {...income, timestamp: new Date().toISOString() });
+    return newIncomeRef.key;
+};
+
+export const updateIncome = async (id: string, income: Omit<Income, 'id' | 'timestamp'> & { timestamp?: Date | string }) => {
+    const docRef = ref(db, `incomes/${id}`);
+    const existingIncomeSnap = await get(docRef);
+    const existingIncome = existingIncomeSnap.val();
+
+    await set(docRef, {
+      ...income,
+      // Preserve original timestamp if not provided in update
+      timestamp: income.timestamp ? (income.timestamp instanceof Date ? income.timestamp.toISOString() : income.timestamp) : existingIncome.timestamp
+    });
+};
+
+export const deleteIncome = async (id: string) => {
+    const docRef = ref(db, `incomes/${id}`);
+    await remove(docRef);
+};
+
 
 // Dashboard Data
 export const getDashboardData = async (): Promise<DashboardData> => {
   try {
-    const [tripDays, members, expenses] = await Promise.all([
+    const [tripDays, members, expenses, incomes] = await Promise.all([
       getTripDays(),
       getMembers(),
       getExpenses(),
+      getIncomes(),
     ]);
 
     const overallBudget = tripDays.reduce((sum, day) => sum + day.budget, 0);
     const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
-    const remainingBudget = overallBudget - totalExpenses;
+    const totalIncomes = incomes.reduce((sum, inc) => sum + inc.amount, 0);
+    const remainingBudget = overallBudget + totalIncomes - totalExpenses;
 
     return {
       overallBudget,
       totalExpenses,
       remainingBudget,
-      members,
-      expenses,
-      tripDays,
+      totalIncomes,
+      members: members || [],
+      expenses: expenses || [],
+      tripDays: tripDays || [],
+      incomes: incomes || [],
     };
   } catch (error) {
-    console.error("Permission denied. Please check your Realtime Database rules.", error);
+    console.error("Error fetching dashboard data.", error);
     // Return a default empty state if rules deny access or data is not present
     return {
       overallBudget: 0,
       totalExpenses: 0,
       remainingBudget: 0,
+      totalIncomes: 0,
       members: [],
       expenses: [],
       tripDays: [],
+      incomes: [],
     };
   }
 };

@@ -6,7 +6,8 @@ import {
   Map,
   Users,
   Menu,
-  PieChart
+  PieChart,
+  TrendingUp
 } from "lucide-react"
 import { usePathname, useRouter } from 'next/navigation';
 import React, { useEffect } from 'react';
@@ -68,6 +69,7 @@ export default function DashboardLayout({
         { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
         { href: "/dashboard/trip", icon: Map, label: "Trip Plan" },
         { href: "/dashboard/members", icon: Users, label: "Members" },
+        { href: "/dashboard/income", icon: TrendingUp, label: "Income" },
         { href: "/dashboard/summary", icon: PieChart, label: "Summary" },
     ];
 

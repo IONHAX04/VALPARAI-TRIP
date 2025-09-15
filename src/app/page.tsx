@@ -29,7 +29,7 @@ export default async function PublicDashboard() {
         </div>
       </header>
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
-        <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-5">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Overall Budget</CardTitle>
@@ -38,6 +38,16 @@ export default async function PublicDashboard() {
             <CardContent>
               <div className="text-2xl font-bold">₹{data.overallBudget.toLocaleString()}</div>
               <p className="text-xs text-muted-foreground">Total planned budget for the trip</p>
+            </CardContent>
+          </Card>
+           <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Income</CardTitle>
+               <span className="text-muted-foreground">📈</span>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">₹{data.totalIncomes.toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground">Sum of all income</p>
             </CardContent>
           </Card>
           <Card>
