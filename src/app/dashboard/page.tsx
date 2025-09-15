@@ -6,7 +6,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 import type { DashboardData } from '@/lib/types';
 import { useEffect, useState } from 'react';
-import AiChartPanel from '@/components/dashboard/ai-chart-panel';
 
 
 export default function Dashboard() {
@@ -55,7 +54,6 @@ export default function Dashboard() {
                 </Card>
                 <RecentExpenses expenses={data.expenses} />
             </div>
-             <AiChartPanel expenses={data.expenses} overallBudget={data.overallBudget} />
         </>
     );
 }
