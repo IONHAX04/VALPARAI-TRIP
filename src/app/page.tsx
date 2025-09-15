@@ -1,14 +1,13 @@
-import { getMockDashboardData } from '@/lib/data';
+import { getDashboardData } from '@/lib/data';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/logo';
 import Link from 'next/link';
 
 export default async function PublicDashboard() {
-  const data = await getMockDashboardData();
+  const data = await getDashboardData();
 
   const getInitials = (name: string) => name.substring(0, 2).toUpperCase();
 
@@ -92,7 +91,11 @@ export default async function PublicDashboard() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {data.tripDays.map((day, index) => (
+                        {data.tripDays.length === 0 ? (
+                           <TableRow>
+                                <TableCell colSpan={3} className="text-center h-24 text-muted-foreground">No trip days planned yet.</TableCell>
+                            </TableRow>
+                        ) : data.tripDays.map((day, index) => (
                         <TableRow key={day.id}>
                             <TableCell>
                             <div className="font-medium">Day {index + 1}</div>
@@ -113,7 +116,9 @@ export default async function PublicDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {memberContributions.map(member => (
+                  {memberContributions.length === 0 ? (
+                       <p className="text-center text-muted-foreground py-10">No members have contributed yet.</p>
+                  ) : memberContributions.map(member => (
                     <div key={member.id} className="flex items-center">
                       <Avatar className="h-9 w-9">
                          <AvatarFallback>{getInitials(member.name)}</AvatarFallback>

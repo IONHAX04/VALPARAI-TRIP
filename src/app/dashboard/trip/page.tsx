@@ -16,11 +16,11 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { TripDay } from '@/lib/types';
-import { getMockTripDays } from '@/lib/data';
-import { Timestamp } from 'firebase/firestore';
+import { getTripDays, addTripDay, updateTripDay, deleteTripDay } from '@/lib/data';
 import { useToast } from '@/hooks/use-toast';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const tripDaySchema = z.object({
   date: z.date({
@@ -32,21 +32,31 @@ const tripDaySchema = z.object({
 
 export default function TripPage() {
   const [tripDays, setTripDays] = useState<TripDay[]>([]);
-  const [isAddTripDayDialogOpen, setAddTripDayDialogOpen] = useState(false);
-  const [isEditTripDayDialogOpen, setEditTripDayDialogOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTripDay, setEditingTripDay] = useState<TripDay | null>(null);
   const { toast } = useToast();
 
+  const fetchTripDays = async () => {
+    setIsLoading(true);
+    try {
+      const days = await getTripDays();
+      setTripDays(days);
+    } catch (error) {
+      toast({ title: "Error fetching trip days", description: "Could not load trip itinerary.", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    getMockTripDays().then(setTripDays);
+    fetchTripDays();
   }, []);
   
   const form = useForm<z.infer<typeof tripDaySchema>>({
     resolver: zodResolver(tripDaySchema),
-    defaultValues: {
-      places: "",
-      budget: 0,
-    },
+    defaultValues: { places: "", budget: 0, date: undefined },
   });
 
    useEffect(() => {
@@ -62,43 +72,51 @@ export default function TripPage() {
   }, [editingTripDay, form]);
 
 
-  function onSubmit(values: z.infer<typeof tripDaySchema>) {
-     if (editingTripDay) {
-      // In a real app, you would update this in Firestore
-      const updatedDay: TripDay = { ...editingTripDay, ...values, date: Timestamp.fromDate(values.date) };
-      setTripDays(prev => prev.map(d => d.id === updatedDay.id ? updatedDay : d).sort((a,b) => a.date.toMillis() - b.date.toMillis()));
-      toast({ title: "Trip Day Updated!", description: `Successfully updated plan for ${values.date.toLocaleDateString()}.` });
-      setEditTripDayDialogOpen(false);
-      setEditingTripDay(null);
-    } else {
-      // In a real app, you would save this to Firestore
-      const newDay: TripDay = {
-          id: `day${tripDays.length + 1}`,
-          ...values,
-          date: Timestamp.fromDate(values.date)
-      };
-      setTripDays(prev => [...prev, newDay].sort((a,b) => a.date.toMillis() - b.date.toMillis()));
-      toast({
-        title: "Trip Day Added!",
-        description: `Successfully added plan for ${values.date.toLocaleDateString()}.`,
-      });
-      setAddTripDayDialogOpen(false);
-    }
-    form.reset();
+  async function onSubmit(values: z.infer<typeof tripDaySchema>) {
+    setIsSubmitting(true);
+     try {
+        if (editingTripDay) {
+          await updateTripDay(editingTripDay.id, values);
+          toast({ title: "Trip Day Updated!", description: `Successfully updated plan for ${values.date.toLocaleDateString()}.` });
+        } else {
+          await addTripDay(values);
+          toast({ title: "Trip Day Added!", description: `Successfully added plan for ${values.date.toLocaleDateString()}.` });
+        }
+        await fetchTripDays();
+        setIsDialogOpen(false);
+        setEditingTripDay(null);
+        form.reset();
+     } catch (error) {
+        toast({ title: "Submission Error", description: "Failed to save trip day.", variant: "destructive" });
+     } finally {
+        setIsSubmitting(false);
+     }
   }
 
-  function handleDeleteTripDay(tripDayId: string) {
-    setTripDays(prev => prev.filter(day => day.id !== tripDayId));
-    toast({
-        title: "Trip Day Deleted",
-        description: "The trip day has been removed from your itinerary.",
-        variant: "destructive"
-    });
+  async function handleDeleteTripDay(tripDayId: string) {
+    try {
+        await deleteTripDay(tripDayId);
+        toast({ title: "Trip Day Deleted", description: "The trip day has been removed.", variant: "destructive" });
+        await fetchTripDays();
+    } catch (error) {
+        toast({ title: "Delete Error", description: "Failed to delete trip day.", variant: "destructive" });
+    }
   }
 
   function handleEditClick(day: TripDay) {
     setEditingTripDay(day);
-    setEditTripDayDialogOpen(true);
+    setIsDialogOpen(true);
+  }
+
+  function handleAddClick() {
+    setEditingTripDay(null);
+    form.reset({ places: "", budget: 0, date: undefined });
+    setIsDialogOpen(true);
+  }
+  
+  const closeDialog = () => {
+      setIsDialogOpen(false);
+      setEditingTripDay(null);
   }
 
   const TripDayForm = (
@@ -150,7 +168,7 @@ export default function TripPage() {
                       <FormItem>
                           <FormLabel>Places to Visit</FormLabel>
                           <FormControl>
-                              <Input placeholder="e.g., Tea Estates, Nirar Dam" {...field} />
+                              <Input placeholder="e.g., Tea Estates, Nirar Dam" {...field} disabled={isSubmitting}/>
                           </FormControl>
                           <FormMessage />
                       </FormItem>
@@ -163,15 +181,16 @@ export default function TripPage() {
                       <FormItem>
                           <FormLabel>Budget (₹)</FormLabel>
                           <FormControl>
-                              <Input type="number" placeholder="e.g., 1500" {...field} />
+                              <Input type="number" placeholder="e.g., 1500" {...field} disabled={isSubmitting}/>
                           </FormControl>
                           <FormMessage />
                       </FormItem>
                   )}
               />
               <DialogFooter>
-                  <Button type="submit">
-                      {editingTripDay ? 'Save Changes' : 'Add Day'}
+                  <Button type="button" variant="ghost" onClick={closeDialog} disabled={isSubmitting}>Cancel</Button>
+                  <Button type="submit" disabled={isSubmitting}>
+                      {isSubmitting ? 'Saving...' : (editingTripDay ? 'Save Changes' : 'Add Day')}
                   </Button>
               </DialogFooter>
           </form>
@@ -181,25 +200,16 @@ export default function TripPage() {
   return (
     <div className="grid gap-6">
         <div className="flex justify-end">
-            <Dialog open={isAddTripDayDialogOpen} onOpenChange={setAddTripDayDialogOpen}>
-                <DialogTrigger asChild>
-                    <Button onClick={() => setEditingTripDay(null)}><PlusCircle className="mr-2 h-4 w-4" /> Add Trip Day</Button>
-                </DialogTrigger>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Add Trip Day</DialogTitle>
-                        <DialogDescription>Plan a new day for your trip. Add places to visit and a budget.</DialogDescription>
-                    </DialogHeader>
-                    {TripDayForm}
-                </DialogContent>
-            </Dialog>
+             <Button onClick={handleAddClick}><PlusCircle className="mr-2 h-4 w-4" /> Add Trip Day</Button>
         </div>
 
-        <Dialog open={isEditTripDayDialogOpen} onOpenChange={(open) => { setEditTripDayDialogOpen(open); if(!open) setEditingTripDay(null)}}>
+        <Dialog open={isDialogOpen} onOpenChange={(open) => { if(!open) closeDialog(); else setIsDialogOpen(true); }}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Edit Trip Day</DialogTitle>
-                    <DialogDescription>Update the details for this trip day.</DialogDescription>
+                    <DialogTitle>{editingTripDay ? 'Edit Trip Day' : 'Add Trip Day'}</DialogTitle>
+                    <DialogDescription>
+                        {editingTripDay ? 'Update the details for this trip day.' : 'Plan a new day for your trip. Add places to visit and a budget.'}
+                    </DialogDescription>
                 </DialogHeader>
                 {TripDayForm}
             </DialogContent>
@@ -211,55 +221,67 @@ export default function TripPage() {
           <CardDescription>Here is your currently planned trip schedule.</CardDescription>
         </CardHeader>
         <CardContent>
-           <Table>
-                <TableHeader>
-                    <TableRow>
-                    <TableHead>Day</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Places</TableHead>
-                    <TableHead>Budget</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {tripDays.map((day, index) => (
-                    <TableRow key={day.id}>
-                        <TableCell className="font-semibold">Day {index + 1}</TableCell>
-                        <TableCell>{day.date.toDate().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</TableCell>
-                        <TableCell>{day.places}</TableCell>
-                        <TableCell>₹{day.budget.toLocaleString()}</TableCell>
-                        <TableCell className="text-right">
-                           <div className="flex gap-2 justify-end">
-                                <Button variant="ghost" size="icon" onClick={() => handleEditClick(day)}>
-                                    <Pencil className="h-4 w-4" />
-                                    <span className="sr-only">Edit</span>
-                                </Button>
-                                <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                        <Button variant="ghost" size="icon">
-                                            <Trash2 className="h-4 w-4 text-destructive" />
-                                            <span className="sr-only">Delete</span>
-                                        </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                        <AlertDialogHeader>
-                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                            This action cannot be undone. This will permanently delete the trip day.
-                                        </AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => handleDeleteTripDay(day.id)}>Delete</AlertDialogAction>
-                                        </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                </AlertDialog>
-                           </div>
-                        </TableCell>
-                    </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
+           {isLoading ? (
+                <div className="space-y-4">
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                </div>
+           ) : (
+            <Table>
+                    <TableHeader>
+                        <TableRow>
+                        <TableHead>Day</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Places</TableHead>
+                        <TableHead>Budget</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {tripDays.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={5} className="text-center h-24 text-muted-foreground">No trip days planned yet.</TableCell>
+                            </TableRow>
+                        ) : tripDays.map((day, index) => (
+                        <TableRow key={day.id}>
+                            <TableCell className="font-semibold">Day {index + 1}</TableCell>
+                            <TableCell>{day.date.toDate().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</TableCell>
+                            <TableCell>{day.places}</TableCell>
+                            <TableCell>₹{day.budget.toLocaleString()}</TableCell>
+                            <TableCell className="text-right">
+                            <div className="flex gap-2 justify-end">
+                                    <Button variant="ghost" size="icon" onClick={() => handleEditClick(day)}>
+                                        <Pencil className="h-4 w-4" />
+                                        <span className="sr-only">Edit</span>
+                                    </Button>
+                                    <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                            <Button variant="ghost" size="icon">
+                                                <Trash2 className="h-4 w-4 text-destructive" />
+                                                <span className="sr-only">Delete</span>
+                                            </Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                This action cannot be undone. This will permanently delete the trip day.
+                                            </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => handleDeleteTripDay(day.id)}>Delete</AlertDialogAction>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
+                            </div>
+                            </TableCell>
+                        </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+           )}
         </CardContent>
       </Card>
     </div>

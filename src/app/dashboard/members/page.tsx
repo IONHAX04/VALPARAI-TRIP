@@ -11,13 +11,13 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { PlusCircle, Wallet, Pencil, Trash2 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import type { Member, Expense } from '@/lib/types';
-import { getMockMembers, MOCK_EXPENSES } from '@/lib/data';
-import { Timestamp } from 'firebase/firestore';
+import { getMembers, addMember, updateMember, deleteMember, getExpenses, addExpense, updateExpense, deleteExpense } from '@/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const memberSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -33,7 +33,9 @@ const expenseSchema = z.object({
 export default function MembersPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  
+  const [isLoadingMembers, setIsLoadingMembers] = useState(true);
+  const [isLoadingExpenses, setIsLoadingExpenses] = useState(true);
+
   const [isMemberDialogOpen, setIsMemberDialogOpen] = useState(false);
   const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false);
   
@@ -42,9 +44,33 @@ export default function MembersPage() {
   
   const { toast } = useToast();
 
+  const fetchMembers = async () => {
+    setIsLoadingMembers(true);
+    try {
+        const data = await getMembers();
+        setMembers(data);
+    } catch(e) {
+        toast({ title: 'Error', description: 'Could not fetch members', variant: 'destructive' });
+    } finally {
+        setIsLoadingMembers(false);
+    }
+  }
+
+  const fetchExpenses = async () => {
+      setIsLoadingExpenses(true);
+      try {
+          const data = await getExpenses();
+          setExpenses(data);
+      } catch (e) {
+          toast({ title: 'Error', description: 'Could not fetch expenses', variant: 'destructive' });
+      } finally {
+          setIsLoadingExpenses(false);
+      }
+  }
+
   useEffect(() => {
-    getMockMembers().then(setMembers);
-    setExpenses(MOCK_EXPENSES);
+    fetchMembers();
+    fetchExpenses();
   }, []);
 
   const memberForm = useForm<z.infer<typeof memberSchema>>({
@@ -77,20 +103,21 @@ export default function MembersPage() {
     }
   }, [editingExpense, expenseForm]);
 
-
-  function onMemberSubmit(values: z.infer<typeof memberSchema>) {
-    if (editingMember) {
-      const updatedMember = { ...editingMember, ...values };
-      setMembers(prev => prev.map(m => m.id === updatedMember.id ? updatedMember : m));
-      toast({ title: "Member Updated!", description: `${values.name} has been updated.` });
-    } else {
-      const newMember: Member = { id: `member${members.length + 1}`, ...values };
-      setMembers(prev => [...prev, newMember]);
-      toast({ title: "Member Added!", description: `${values.name} has been added to the trip.` });
+  async function onMemberSubmit(values: z.infer<typeof memberSchema>) {
+    try {
+        if (editingMember) {
+            await updateMember(editingMember.id, values);
+            toast({ title: "Member Updated!", description: `${values.name} has been updated.` });
+        } else {
+            await addMember(values);
+            toast({ title: "Member Added!", description: `${values.name} has been added to the trip.` });
+        }
+        fetchMembers();
+        setIsMemberDialogOpen(false);
+        setEditingMember(null);
+    } catch(e) {
+        toast({ title: "Error", description: "Could not save member.", variant: "destructive"})
     }
-    memberForm.reset();
-    setIsMemberDialogOpen(false);
-    setEditingMember(null);
   }
 
   function handleEditMember(member: Member) {
@@ -98,32 +125,35 @@ export default function MembersPage() {
     setIsMemberDialogOpen(true);
   }
 
-  function handleDeleteMember(memberId: string) {
-    setMembers(prev => prev.filter(m => m.id !== memberId));
-    toast({ title: "Member Deleted", variant: 'destructive' });
+  async function handleDeleteMember(memberId: string) {
+    try {
+        await deleteMember(memberId);
+        toast({ title: "Member Deleted", variant: 'destructive' });
+        fetchMembers();
+    } catch (e) {
+        toast({ title: "Error", description: "Could not delete member.", variant: 'destructive'});
+    }
   }
 
-  function onExpenseSubmit(values: z.infer<typeof expenseSchema>) {
+  async function onExpenseSubmit(values: z.infer<typeof expenseSchema>) {
     const member = members.find(m => m.id === values.memberId);
     if (!member) return;
 
-    if (editingExpense) {
-        const updatedExpense = { ...editingExpense, ...values, memberName: member.name };
-        setExpenses(prev => prev.map(e => e.id === updatedExpense.id ? updatedExpense : e));
-        toast({ title: "Expense Updated!", description: `Expense for ${values.purpose} has been updated.` });
-    } else {
-        const newExpense: Expense = {
-            id: `exp${expenses.length + 1}`,
-            ...values,
-            memberName: member.name,
-            timestamp: Timestamp.now(),
-        };
-        setExpenses(prev => [...prev, newExpense]);
-        toast({ title: "Expense Added!", description: `₹${values.amount} for ${values.purpose} has been logged.` });
+    const expenseData = { ...values, memberName: member.name };
+    try {
+        if (editingExpense) {
+            await updateExpense(editingExpense.id, expenseData);
+            toast({ title: "Expense Updated!", description: `Expense for ${values.purpose} has been updated.` });
+        } else {
+            await addExpense(expenseData);
+            toast({ title: "Expense Added!", description: `₹${values.amount} for ${values.purpose} has been logged.` });
+        }
+        fetchExpenses();
+        setIsExpenseDialogOpen(false);
+        setEditingExpense(null);
+    } catch(e) {
+        toast({ title: "Error", description: "Could not save expense.", variant: "destructive"});
     }
-    expenseForm.reset();
-    setIsExpenseDialogOpen(false);
-    setEditingExpense(null);
   }
 
   function handleEditExpense(expense: Expense) {
@@ -131,9 +161,14 @@ export default function MembersPage() {
     setIsExpenseDialogOpen(true);
   }
 
-  function handleDeleteExpense(expenseId: string) {
-    setExpenses(prev => prev.filter(e => e.id !== expenseId));
-    toast({ title: "Expense Deleted", variant: 'destructive' });
+  async function handleDeleteExpense(expenseId: string) {
+    try {
+        await deleteExpense(expenseId);
+        toast({ title: "Expense Deleted", variant: 'destructive' });
+        fetchExpenses();
+    } catch(e) {
+        toast({ title: "Error", description: "Could not delete expense.", variant: 'destructive' });
+    }
   }
 
   const memberDialogContent = (
@@ -151,6 +186,7 @@ export default function MembersPage() {
                 <FormItem><FormLabel>Role</FormLabel><FormControl><Input placeholder="e.g., Organizer" {...field} /></FormControl><FormMessage /></FormItem>
             )} />
             <DialogFooter>
+                <Button type="button" variant="ghost" onClick={() => setIsMemberDialogOpen(false)}>Cancel</Button>
                 <Button type="submit">{editingMember ? "Save Changes" : "Add Member"}</Button>
             </DialogFooter>
             </form>
@@ -187,6 +223,7 @@ export default function MembersPage() {
                     <FormItem><FormLabel>Purpose</FormLabel><FormControl><Input placeholder="e.g., Groceries" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <DialogFooter>
+                    <Button type="button" variant="ghost" onClick={() => setIsExpenseDialogOpen(false)}>Cancel</Button>
                     <Button type="submit">{editingExpense ? 'Save Changes' : 'Log Expense'}</Button>
                 </DialogFooter>
             </form>
@@ -212,10 +249,18 @@ export default function MembersPage() {
             <Button onClick={() => { setEditingMember(null); setIsMemberDialogOpen(true); }}><PlusCircle className="mr-2 h-4 w-4" /> Add Member</Button>
         </CardHeader>
         <CardContent>
+        {isLoadingMembers ? (
+            <div className="space-y-2">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+            </div>
+        ) : (
         <Table>
             <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Role</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
             <TableBody>
-            {members.map(member => (
+            {members.length === 0 ? (
+                <TableRow><TableCell colSpan={3} className="h-24 text-center text-muted-foreground">No members added yet.</TableCell></TableRow>
+            ) : members.map(member => (
                 <TableRow key={member.id}>
                     <TableCell>{member.name}</TableCell>
                     <TableCell>{member.role}</TableCell>
@@ -242,6 +287,7 @@ export default function MembersPage() {
             ))}
             </TableBody>
         </Table>
+        )}
         </CardContent>
       </Card>
       
@@ -254,10 +300,19 @@ export default function MembersPage() {
             <Button onClick={() => { setEditingExpense(null); setIsExpenseDialogOpen(true); }}><Wallet className="mr-2 h-4 w-4" /> Add Expense</Button>
         </CardHeader>
         <CardContent>
+        {isLoadingExpenses ? (
+            <div className="space-y-2">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+            </div>
+        ) : (
           <Table>
             <TableHeader><TableRow><TableHead>Member</TableHead><TableHead>Purpose</TableHead><TableHead>Date</TableHead><TableHead>Amount</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
             <TableBody>
-              {expenses.sort((a,b) => b.timestamp.toMillis() - a.timestamp.toMillis()).map(expense => (
+              {expenses.length === 0 ? (
+                <TableRow><TableCell colSpan={5} className="h-24 text-center text-muted-foreground">No expenses logged yet.</TableCell></TableRow>
+              ) : expenses.map(expense => (
                 <TableRow key={expense.id}>
                   <TableCell>{expense.memberName}</TableCell>
                   <TableCell>{expense.purpose}</TableCell>
@@ -286,6 +341,7 @@ export default function MembersPage() {
               ))}
             </TableBody>
           </Table>
+        )}
         </CardContent>
       </Card>
     </div>

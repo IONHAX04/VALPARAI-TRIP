@@ -7,7 +7,7 @@ interface RecentExpensesProps {
 }
 
 export default function RecentExpenses({ expenses }: RecentExpensesProps) {
-    const recentExpenses = [...expenses].sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis()).slice(0, 5);
+    const recentExpenses = expenses.slice(0, 5);
 
     return (
         <Card>
@@ -16,27 +16,33 @@ export default function RecentExpenses({ expenses }: RecentExpensesProps) {
                 <CardDescription>A log of the most recent contributions.</CardDescription>
             </CardHeader>
             <CardContent>
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Member</TableHead>
-                            <TableHead>Purpose</TableHead>
-                            <TableHead className="text-right">Amount</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {recentExpenses.map(expense => (
-                            <TableRow key={expense.id}>
-                                <TableCell>
-                                    <div className="font-medium">{expense.memberName}</div>
-                                    <div className="text-sm text-muted-foreground">{expense.timestamp.toDate().toLocaleDateString()}</div>
-                                </TableCell>
-                                <TableCell>{expense.purpose}</TableCell>
-                                <TableCell className="text-right">₹{expense.amount.toLocaleString()}</TableCell>
+                {recentExpenses.length === 0 ? (
+                    <div className="text-center text-muted-foreground py-12">
+                        No expenses logged yet.
+                    </div>
+                ) : (
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Member</TableHead>
+                                <TableHead>Purpose</TableHead>
+                                <TableHead className="text-right">Amount</TableHead>
                             </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
+                        </TableHeader>
+                        <TableBody>
+                            {recentExpenses.map(expense => (
+                                <TableRow key={expense.id}>
+                                    <TableCell>
+                                        <div className="font-medium">{expense.memberName}</div>
+                                        <div className="text-sm text-muted-foreground">{expense.timestamp.toDate().toLocaleDateString()}</div>
+                                    </TableCell>
+                                    <TableCell>{expense.purpose}</TableCell>
+                                    <TableCell className="text-right">₹{expense.amount.toLocaleString()}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                )}
             </CardContent>
         </Card>
     );
