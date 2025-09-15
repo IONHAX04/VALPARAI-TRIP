@@ -34,7 +34,7 @@ export default function RecentExpenses({ expenses }: RecentExpensesProps) {
                                 <TableRow key={expense.id}>
                                     <TableCell>
                                         <div className="font-medium">{expense.memberName}</div>
-                                        <div className="text-sm text-muted-foreground">{expense.timestamp.toDate().toLocaleDateString()}</div>
+                                        <div className="text-sm text-muted-foreground">{new Date(expense.timestamp).toLocaleDateString()}</div>
                                     </TableCell>
                                     <TableCell>{expense.purpose}</TableCell>
                                     <TableCell className="text-right">₹{expense.amount.toLocaleString()}</TableCell>

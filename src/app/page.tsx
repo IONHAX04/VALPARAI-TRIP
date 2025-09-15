@@ -99,7 +99,7 @@ export default async function PublicDashboard() {
                         <TableRow key={day.id}>
                             <TableCell>
                             <div className="font-medium">Day {index + 1}</div>
-                            <div className="text-sm text-muted-foreground">{day.date.toDate().toLocaleDateString()}</div>
+                            <div className="text-sm text-muted-foreground">{new Date(day.date).toLocaleDateString()}</div>
                             </TableCell>
                             <TableCell>{day.places}</TableCell>
                             <TableCell className="text-right">₹{day.budget.toLocaleString()}</TableCell>

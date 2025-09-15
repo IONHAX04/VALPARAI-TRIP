@@ -1,131 +1,149 @@
 import {
-  collection,
-  getDocs,
-  doc,
-  addDoc,
-  updateDoc,
-  deleteDoc,
+  ref,
+  get,
+  set,
+  push,
+  child,
+  remove,
   query,
-  orderBy,
-  writeBatch,
-} from 'firebase/firestore';
+  orderByChild,
+  equalTo,
+} from 'firebase/database';
 import { db } from './firebase';
 import type { DashboardData, Member, Expense, TripDay } from '@/lib/types';
-import { Timestamp } from 'firebase/firestore';
 
-// Collection References
-const tripDaysCollection = collection(db, 'tripDays');
-const membersCollection = collection(db, 'members');
-const expensesCollection = collection(db, 'expenses');
+// Helper function to transform snapshot data from Realtime DB
+const snapshotToArray = (snapshot: any) => {
+    const data: any[] = [];
+    if (snapshot.exists()) {
+        snapshot.forEach((childSnapshot: any) => {
+            data.push({ id: childSnapshot.key, ...childSnapshot.val() });
+        });
+    }
+    return data;
+}
 
 // TripDay Functions
 export const getTripDays = async (): Promise<TripDay[]> => {
-  const q = query(tripDaysCollection, orderBy('date', 'asc'));
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(
-    (doc) => ({ ...doc.data(), id: doc.id } as TripDay)
-  );
+  const tripDaysRef = ref(db, 'tripDays');
+  const q = query(tripDaysRef, orderByChild('date'));
+  const snapshot = await get(q);
+  const data = snapshotToArray(snapshot);
+  return data.map(d => ({ ...d, date: new Date(d.date) })) as TripDay[];
 };
 
 export const addTripDay = async (
   tripDay: Omit<TripDay, 'id' | 'date'> & { date: Date }
 ) => {
-  const { date, ...rest } = tripDay;
-  const newDoc = await addDoc(tripDaysCollection, {
-    ...rest,
-    date: Timestamp.fromDate(date),
-  });
-  return newDoc.id;
+  const tripDaysRef = ref(db, 'tripDays');
+  const newTripDayRef = push(tripDaysRef);
+  await set(newTripDayRef, { ...tripDay, date: tripDay.date.toISOString() });
+  return newTripDayRef.key;
 };
 
 export const updateTripDay = async (
   id: string,
   tripDay: Omit<TripDay, 'id' | 'date'> & { date: Date }
 ) => {
-  const { date, ...rest } = tripDay;
-  const docRef = doc(db, 'tripDays', id);
-  await updateDoc(docRef, { ...rest, date: Timestamp.fromDate(date) });
+  const tripDayRef = ref(db, `tripDays/${id}`);
+  await set(tripDayRef, { ...tripDay, date: tripDay.date.toISOString() });
 };
 
 export const deleteTripDay = async (id: string) => {
-  const docRef = doc(db, 'tripDays', id);
-  await deleteDoc(docRef);
+  const tripDayRef = ref(db, `tripDays/${id}`);
+  await remove(tripDayRef);
 };
 
 // Member Functions
 export const getMembers = async (): Promise<Member[]> => {
-  const snapshot = await getDocs(membersCollection);
-  return snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id } as Member));
+  const membersRef = ref(db, 'members');
+  const snapshot = await get(membersRef);
+  return snapshotToArray(snapshot) as Member[];
 };
 
 export const addMember = async (member: Omit<Member, 'id'>) => {
-  const newDoc = await addDoc(membersCollection, member);
-  return newDoc.id;
+  const membersRef = ref(db, 'members');
+  const newMemberRef = push(membersRef);
+  await set(newMemberRef, member);
+  return newMemberRef.key;
 };
 
 export const updateMember = async (id: string, member: Omit<Member, 'id'>) => {
-  const docRef = doc(db, 'members', id);
-  await updateDoc(docRef, member);
+  const memberRef = ref(db, `members/${id}`);
+  await set(memberRef, member);
 };
 
 export const deleteMember = async (id: string) => {
-  const docRef = doc(db, 'members', id);
-  await deleteDoc(docRef);
+  const memberRef = ref(db, `members/${id}`);
+  await remove(memberRef);
 };
 
 // Expense Functions
 export const getExpenses = async (): Promise<Expense[]> => {
-    const q = query(expensesCollection, orderBy('timestamp', 'desc'));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map((doc) => ({...doc.data(), id: doc.id} as Expense));
+    const expensesRef = ref(db, 'expenses');
+    const q = query(expensesRef, orderByChild('timestamp'));
+    const snapshot = await get(q);
+    const data = snapshotToArray(snapshot);
+    // Realtime DB sorts ascending, so we reverse for descending order
+    return data.map(d => ({ ...d, timestamp: new Date(d.timestamp) })).reverse() as Expense[];
 };
 
 export const addExpense = async (expense: Omit<Expense, 'id'|'timestamp'>) => {
-  const newDoc = await addDoc(expensesCollection, {
-      ...expense,
-      timestamp: Timestamp.now(),
-  });
-  return newDoc.id;
+    const expensesRef = ref(db, 'expenses');
+    const newExpenseRef = push(expensesRef);
+    await set(newExpenseRef, {...expense, timestamp: new Date().toISOString() });
+    return newExpenseRef.key;
 };
 
-export const updateExpense = async (id: string, expense: Omit<Expense, 'id' | 'timestamp'>) => {
-    const docRef = doc(db, 'expenses', id);
-    await updateDoc(docRef, expense);
+export const updateExpense = async (id: string, expense: Omit<Expense, 'id' | 'timestamp'> & { timestamp?: Date | string }) => {
+    const docRef = ref(db, `expenses/${id}`);
+    const existingExpenseSnap = await get(docRef);
+    const existingExpense = existingExpenseSnap.val();
+
+    await set(docRef, {
+      ...expense,
+      // Preserve original timestamp if not provided in update
+      timestamp: expense.timestamp ? (expense.timestamp instanceof Date ? expense.timestamp.toISOString() : expense.timestamp) : existingExpense.timestamp
+    });
 };
 
 export const deleteExpense = async (id: string) => {
-    const docRef = doc(db, 'expenses', id);
-    await deleteDoc(docRef);
+    const docRef = ref(db, `expenses/${id}`);
+    await remove(docRef);
 };
 
 
 // Dashboard Data
 export const getDashboardData = async (): Promise<DashboardData> => {
-  const [tripDays, members, expenses] = await Promise.all([
-    getTripDays(),
-    getMembers(),
-    getExpenses(),
-  ]);
+  try {
+    const [tripDays, members, expenses] = await Promise.all([
+      getTripDays(),
+      getMembers(),
+      getExpenses(),
+    ]);
 
-  const overallBudget = tripDays.reduce((sum, day) => sum + day.budget, 0);
-  const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
-  const remainingBudget = overallBudget - totalExpenses;
+    const overallBudget = tripDays.reduce((sum, day) => sum + day.budget, 0);
+    const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
+    const remainingBudget = overallBudget - totalExpenses;
 
-  return {
-    overallBudget,
-    totalExpenses,
-    remainingBudget,
-    members,
-    expenses,
-    tripDays,
-  };
+    return {
+      overallBudget,
+      totalExpenses,
+      remainingBudget,
+      members,
+      expenses,
+      tripDays,
+    };
+  } catch (error) {
+    console.error("Permission denied. Please check your Realtime Database rules.", error);
+    // Return a default empty state if rules deny access or data is not present
+    return {
+      overallBudget: 0,
+      totalExpenses: 0,
+      remainingBudget: 0,
+      members: [],
+      expenses: [],
+      tripDays: [],
+    };
+  }
 };
-
-// Mock data has been removed and replaced with Firestore calls.
-// The functions below are for reference to what was removed.
-export const getMockDashboardData = async (): Promise<DashboardData> => ({ overallBudget: 0, totalExpenses: 0, remainingBudget: 0, members: [], expenses: [], tripDays: [] });
-export const getMockTripDays = async (): Promise<TripDay[]> => [];
-export const getMockMembers = async (): Promise<Member[]> => [];
-export const MOCK_TRIP_DAYS: TripDay[] = [];
-export const MOCK_MEMBERS: Member[] = [];
-export const MOCK_EXPENSES: Expense[] = [];

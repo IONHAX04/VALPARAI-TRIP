@@ -62,7 +62,7 @@ export default function TripPage() {
    useEffect(() => {
     if (editingTripDay) {
       form.reset({
-        date: editingTripDay.date.toDate(),
+        date: new Date(editingTripDay.date),
         places: editingTripDay.places,
         budget: editingTripDay.budget,
       });
@@ -246,7 +246,7 @@ export default function TripPage() {
                         ) : tripDays.map((day, index) => (
                         <TableRow key={day.id}>
                             <TableCell className="font-semibold">Day {index + 1}</TableCell>
-                            <TableCell>{day.date.toDate().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</TableCell>
+                            <TableCell>{new Date(day.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</TableCell>
                             <TableCell>{day.places}</TableCell>
                             <TableCell>₹{day.budget.toLocaleString()}</TableCell>
                             <TableCell className="text-right">

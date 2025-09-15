@@ -316,7 +316,7 @@ export default function MembersPage() {
                 <TableRow key={expense.id}>
                   <TableCell>{expense.memberName}</TableCell>
                   <TableCell>{expense.purpose}</TableCell>
-                  <TableCell>{expense.timestamp.toDate().toLocaleDateString()}</TableCell>
+                  <TableCell>{new Date(expense.timestamp).toLocaleDateString()}</TableCell>
                   <TableCell>₹{expense.amount.toLocaleString()}</TableCell>
                    <TableCell className="text-right">
                         <div className="flex justify-end gap-2">

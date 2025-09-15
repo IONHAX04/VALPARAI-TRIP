@@ -1,14 +1,13 @@
-import type { Timestamp } from 'firebase/firestore';
 
 export interface TripDay {
   id: string;
-  date: Timestamp;
+  date: Date;
   places: string;
   budget: number;
 }
 
 export interface Member {
-  id: string;
+  id:string;
   name: string;
   role: string;
 }
@@ -19,7 +18,7 @@ export interface Expense {
   memberName: string;
   amount: number;
   purpose: string;
-  timestamp: Timestamp;
+  timestamp: Date;
 }
 
 export interface DashboardData {
