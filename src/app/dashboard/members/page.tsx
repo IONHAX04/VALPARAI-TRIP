@@ -9,9 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { PlusCircle, Wallet } from "lucide-react";
+import { PlusCircle, Wallet, Pencil, Trash2 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import type { Member, Expense } from '@/lib/types';
 import { getMockMembers, MOCK_EXPENSES } from '@/lib/data';
 import { Timestamp } from 'firebase/firestore';
@@ -32,7 +33,13 @@ const expenseSchema = z.object({
 export default function MembersPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  
+  const [isMemberDialogOpen, setIsMemberDialogOpen] = useState(false);
   const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false);
+  
+  const [editingMember, setEditingMember] = useState<Member | null>(null);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  
   const { toast } = useToast();
 
   useEffect(() => {
@@ -47,125 +54,234 @@ export default function MembersPage() {
 
   const expenseForm = useForm<z.infer<typeof expenseSchema>>({
     resolver: zodResolver(expenseSchema),
-    defaultValues: { amount: 0, purpose: "" },
+    defaultValues: { memberId: "", amount: 0, purpose: "" },
   });
+  
+  useEffect(() => {
+    if (editingMember) {
+      memberForm.reset(editingMember);
+    } else {
+      memberForm.reset({ name: "", role: "" });
+    }
+  }, [editingMember, memberForm]);
+
+  useEffect(() => {
+    if (editingExpense) {
+      expenseForm.reset({
+        memberId: editingExpense.memberId,
+        amount: editingExpense.amount,
+        purpose: editingExpense.purpose,
+      });
+    } else {
+      expenseForm.reset({ memberId: "", amount: 0, purpose: "" });
+    }
+  }, [editingExpense, expenseForm]);
+
 
   function onMemberSubmit(values: z.infer<typeof memberSchema>) {
-    const newMember: Member = { id: `member${members.length + 1}`, ...values };
-    setMembers(prev => [...prev, newMember]);
-    toast({ title: "Member Added!", description: `${values.name} has been added to the trip.` });
+    if (editingMember) {
+      const updatedMember = { ...editingMember, ...values };
+      setMembers(prev => prev.map(m => m.id === updatedMember.id ? updatedMember : m));
+      toast({ title: "Member Updated!", description: `${values.name} has been updated.` });
+    } else {
+      const newMember: Member = { id: `member${members.length + 1}`, ...values };
+      setMembers(prev => [...prev, newMember]);
+      toast({ title: "Member Added!", description: `${values.name} has been added to the trip.` });
+    }
     memberForm.reset();
+    setIsMemberDialogOpen(false);
+    setEditingMember(null);
+  }
+
+  function handleEditMember(member: Member) {
+    setEditingMember(member);
+    setIsMemberDialogOpen(true);
+  }
+
+  function handleDeleteMember(memberId: string) {
+    setMembers(prev => prev.filter(m => m.id !== memberId));
+    toast({ title: "Member Deleted", variant: 'destructive' });
   }
 
   function onExpenseSubmit(values: z.infer<typeof expenseSchema>) {
     const member = members.find(m => m.id === values.memberId);
     if (!member) return;
-    const newExpense: Expense = {
-      id: `exp${expenses.length + 1}`,
-      ...values,
-      memberName: member.name,
-      timestamp: Timestamp.now(),
-    };
-    setExpenses(prev => [...prev, newExpense]);
-    toast({ title: "Expense Added!", description: `₹${values.amount} for ${values.purpose} has been logged.` });
+
+    if (editingExpense) {
+        const updatedExpense = { ...editingExpense, ...values, memberName: member.name };
+        setExpenses(prev => prev.map(e => e.id === updatedExpense.id ? updatedExpense : e));
+        toast({ title: "Expense Updated!", description: `Expense for ${values.purpose} has been updated.` });
+    } else {
+        const newExpense: Expense = {
+            id: `exp${expenses.length + 1}`,
+            ...values,
+            memberName: member.name,
+            timestamp: Timestamp.now(),
+        };
+        setExpenses(prev => [...prev, newExpense]);
+        toast({ title: "Expense Added!", description: `₹${values.amount} for ${values.purpose} has been logged.` });
+    }
     expenseForm.reset();
     setIsExpenseDialogOpen(false);
+    setEditingExpense(null);
   }
+
+  function handleEditExpense(expense: Expense) {
+    setEditingExpense(expense);
+    setIsExpenseDialogOpen(true);
+  }
+
+  function handleDeleteExpense(expenseId: string) {
+    setExpenses(prev => prev.filter(e => e.id !== expenseId));
+    toast({ title: "Expense Deleted", variant: 'destructive' });
+  }
+
+  const memberDialogContent = (
+    <DialogContent>
+        <DialogHeader>
+            <DialogTitle>{editingMember ? "Edit Member" : "Add Member"}</DialogTitle>
+            <DialogDescription>{editingMember ? "Update the member's details." : "Add a new participant to the trip."}</DialogDescription>
+        </DialogHeader>
+        <Form {...memberForm}>
+            <form onSubmit={memberForm.handleSubmit(onMemberSubmit)} className="space-y-4">
+            <FormField control={memberForm.control} name="name" render={({ field }) => (
+                <FormItem><FormLabel>Name</FormLabel><FormControl><Input placeholder="e.g., John Doe" {...field} /></FormControl><FormMessage /></FormItem>
+            )} />
+            <FormField control={memberForm.control} name="role" render={({ field }) => (
+                <FormItem><FormLabel>Role</FormLabel><FormControl><Input placeholder="e.g., Organizer" {...field} /></FormControl><FormMessage /></FormItem>
+            )} />
+            <DialogFooter>
+                <Button type="submit">{editingMember ? "Save Changes" : "Add Member"}</Button>
+            </DialogFooter>
+            </form>
+        </Form>
+    </DialogContent>
+  );
+
+  const expenseDialogContent = (
+     <DialogContent>
+        <DialogHeader>
+            <DialogTitle>{editingExpense ? "Edit Expense" : "Log a New Expense"}</DialogTitle>
+            <DialogDescription>{editingExpense ? "Update the expense details." : "Record a payment made by a team member."}</DialogDescription>
+        </DialogHeader>
+        <Form {...expenseForm}>
+            <form onSubmit={expenseForm.handleSubmit(onExpenseSubmit)} className="space-y-4">
+                <FormField control={expenseForm.control} name="memberId" render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Member</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl><SelectTrigger><SelectValue placeholder="Select a member" /></SelectTrigger></FormControl>
+                        <SelectContent>
+                            {members.map(member => (
+                                <SelectItem key={member.id} value={member.id}>{member.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                        </Select>
+                        <FormMessage />
+                    </FormItem>
+                )} />
+                <FormField control={expenseForm.control} name="amount" render={({ field }) => (
+                    <FormItem><FormLabel>Amount (₹)</FormLabel><FormControl><Input type="number" placeholder="e.g., 500" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={expenseForm.control} name="purpose" render={({ field }) => (
+                    <FormItem><FormLabel>Purpose</FormLabel><FormControl><Input placeholder="e.g., Groceries" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <DialogFooter>
+                    <Button type="submit">{editingExpense ? 'Save Changes' : 'Log Expense'}</Button>
+                </DialogFooter>
+            </form>
+        </Form>
+    </DialogContent>
+  )
 
   return (
     <div className="grid gap-6">
-      <div className="grid md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Add Member</CardTitle>
-            <CardDescription>Add a new participant to the trip.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Form {...memberForm}>
-              <form onSubmit={memberForm.handleSubmit(onMemberSubmit)} className="space-y-4">
-                <FormField control={memberForm.control} name="name" render={({ field }) => (
-                  <FormItem><FormLabel>Name</FormLabel><FormControl><Input placeholder="e.g., John Doe" {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
-                <FormField control={memberForm.control} name="role" render={({ field }) => (
-                  <FormItem><FormLabel>Role</FormLabel><FormControl><Input placeholder="e.g., Organizer" {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
-                <Button type="submit"><PlusCircle className="mr-2 h-4 w-4" /> Add Member</Button>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Members List</CardTitle>
-            <CardDescription>All participants of the trip.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Role</TableHead></TableRow></TableHeader>
-              <TableBody>
-                {members.map(member => (
-                  <TableRow key={member.id}><TableCell>{member.name}</TableCell><TableCell>{member.role}</TableCell></TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </div>
+        <Dialog open={isMemberDialogOpen} onOpenChange={open => { setIsMemberDialogOpen(open); if (!open) setEditingMember(null); }}>
+            {memberDialogContent}
+        </Dialog>
+         <Dialog open={isExpenseDialogOpen} onOpenChange={open => { setIsExpenseDialogOpen(open); if (!open) setEditingExpense(null); }}>
+            {expenseDialogContent}
+        </Dialog>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+                <CardTitle>Members List</CardTitle>
+                <CardDescription>All participants of the trip.</CardDescription>
+            </div>
+            <Button onClick={() => { setEditingMember(null); setIsMemberDialogOpen(true); }}><PlusCircle className="mr-2 h-4 w-4" /> Add Member</Button>
+        </CardHeader>
+        <CardContent>
+        <Table>
+            <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Role</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+            <TableBody>
+            {members.map(member => (
+                <TableRow key={member.id}>
+                    <TableCell>{member.name}</TableCell>
+                    <TableCell>{member.role}</TableCell>
+                    <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                            <Button variant="ghost" size="icon" onClick={() => handleEditMember(member)}>
+                                <Pencil className="h-4 w-4" />
+                            </Button>
+                             <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will permanently delete {member.name}.</AlertDialogDescription></AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => handleDeleteMember(member.id)}>Delete</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        </div>
+                    </TableCell>
+                </TableRow>
+            ))}
+            </TableBody>
+        </Table>
+        </CardContent>
+      </Card>
+      
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
             <div>
                 <CardTitle>Expense Log</CardTitle>
                 <CardDescription>A record of all money spent.</CardDescription>
             </div>
-             <Dialog open={isExpenseDialogOpen} onOpenChange={setIsExpenseDialogOpen}>
-                <DialogTrigger asChild>
-                    <Button><Wallet className="mr-2 h-4 w-4" /> Add Expense</Button>
-                </DialogTrigger>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Log a New Expense</DialogTitle>
-                        <DialogDescription>Record a payment made by a team member.</DialogDescription>
-                    </DialogHeader>
-                    <Form {...expenseForm}>
-                        <form onSubmit={expenseForm.handleSubmit(onExpenseSubmit)} className="space-y-4">
-                            <FormField control={expenseForm.control} name="memberId" render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Member</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                    <FormControl><SelectTrigger><SelectValue placeholder="Select a member" /></SelectTrigger></FormControl>
-                                    <SelectContent>
-                                        {members.map(member => (
-                                            <SelectItem key={member.id} value={member.id}>{member.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
-                            <FormField control={expenseForm.control} name="amount" render={({ field }) => (
-                                <FormItem><FormLabel>Amount (₹)</FormLabel><FormControl><Input type="number" placeholder="e.g., 500" {...field} /></FormControl><FormMessage /></FormItem>
-                            )} />
-                            <FormField control={expenseForm.control} name="purpose" render={({ field }) => (
-                                <FormItem><FormLabel>Purpose</FormLabel><FormControl><Input placeholder="e.g., Groceries" {...field} /></FormControl><FormMessage /></FormItem>
-                            )} />
-                            <DialogFooter>
-                                <Button type="submit">Log Expense</Button>
-                            </DialogFooter>
-                        </form>
-                    </Form>
-                </DialogContent>
-            </Dialog>
+            <Button onClick={() => { setEditingExpense(null); setIsExpenseDialogOpen(true); }}><Wallet className="mr-2 h-4 w-4" /> Add Expense</Button>
         </CardHeader>
         <CardContent>
           <Table>
-            <TableHeader><TableRow><TableHead>Member</TableHead><TableHead>Purpose</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Member</TableHead><TableHead>Purpose</TableHead><TableHead>Date</TableHead><TableHead>Amount</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
             <TableBody>
               {expenses.sort((a,b) => b.timestamp.toMillis() - a.timestamp.toMillis()).map(expense => (
                 <TableRow key={expense.id}>
                   <TableCell>{expense.memberName}</TableCell>
                   <TableCell>{expense.purpose}</TableCell>
                   <TableCell>{expense.timestamp.toDate().toLocaleDateString()}</TableCell>
-                  <TableCell className="text-right">₹{expense.amount.toLocaleString()}</TableCell>
+                  <TableCell>₹{expense.amount.toLocaleString()}</TableCell>
+                   <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                            <Button variant="ghost" size="icon" onClick={() => handleEditExpense(expense)}>
+                                <Pencil className="h-4 w-4" />
+                            </Button>
+                             <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will permanently delete this expense record.</AlertDialogDescription></AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => handleDeleteExpense(expense.id)}>Delete</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        </div>
+                    </TableCell>
                 </TableRow>
               ))}
             </TableBody>
