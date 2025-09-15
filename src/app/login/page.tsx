@@ -23,8 +23,8 @@ import { Terminal } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('demo@example.com');
+  const [password, setPassword] = useState('password');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const bgImage = PlaceHolderImages.find(img => img.id === 'valparai-trip');
@@ -61,7 +61,7 @@ export default function LoginPage() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="m@example.com"
+                  placeholder="admin@gmail.com"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
