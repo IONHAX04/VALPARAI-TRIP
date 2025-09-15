@@ -11,11 +11,18 @@ export default async function PublicDashboard() {
 
   const getInitials = (name: string) => name.substring(0, 2).toUpperCase();
 
-  const memberContributions = data.members.map(member => {
-    const contributions = data.expenses.filter(e => e.memberId === member.id);
-    const total = contributions.reduce((sum, e) => sum + e.amount, 0);
+  const memberExpenses = data.members.map(member => {
+    const expenses = data.expenses.filter(e => e.memberId === member.id);
+    const total = expenses.reduce((sum, e) => sum + e.amount, 0);
     return { ...member, total };
   });
+  
+  const memberIncomes = data.members.map(member => {
+    const incomes = data.incomes.filter(i => i.memberId === member.id);
+    const total = incomes.reduce((sum, i) => sum + i.amount, 0);
+    return { ...member, total };
+  });
+
 
   return (
     <div className="flex min-h-screen w-full flex-col">
@@ -71,8 +78,8 @@ export default async function PublicDashboard() {
             </CardContent>
           </Card>
         </div>
-        <div className="grid gap-4 md:gap-8 lg:grid-cols-2">
-            <Card>
+        <div className="grid gap-4 md:gap-8 lg:grid-cols-3">
+            <Card className="lg:col-span-1">
               <CardHeader>
                 <CardTitle>Trip Plan</CardTitle>
                 <CardDescription>Overview of the planned trip days.</CardDescription>
@@ -107,14 +114,38 @@ export default async function PublicDashboard() {
             </Card>
             <Card>
               <CardHeader>
-                <CardTitle>Individual Contributions</CardTitle>
-                 <CardDescription>Total amount contributed by each member.</CardDescription>
+                <CardTitle>Individual Expenses</CardTitle>
+                 <CardDescription>Total amount spent by each member.</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {memberContributions.length === 0 ? (
+                  {memberExpenses.length === 0 ? (
                        <p className="text-center text-muted-foreground py-10">No members have contributed yet.</p>
-                  ) : memberContributions.map(member => (
+                  ) : memberExpenses.map(member => (
+                    <div key={member.id} className="flex items-center">
+                      <Avatar className="h-9 w-9">
+                         <AvatarFallback>{getInitials(member.name)}</AvatarFallback>
+                      </Avatar>
+                      <div className="ml-4 space-y-1">
+                        <p className="text-sm font-medium leading-none">{member.name}</p>
+                        <p className="text-sm text-muted-foreground">{member.role}</p>
+                      </div>
+                      <div className="ml-auto font-medium">₹{member.total.toLocaleString()}</div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+             <Card>
+              <CardHeader>
+                <CardTitle>Individual Income</CardTitle>
+                 <CardDescription>Total income received from each member.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {memberIncomes.length === 0 ? (
+                       <p className="text-center text-muted-foreground py-10">No income received yet.</p>
+                  ) : memberIncomes.filter(m => m.total > 0).map(member => (
                     <div key={member.id} className="flex items-center">
                       <Avatar className="h-9 w-9">
                          <AvatarFallback>{getInitials(member.name)}</AvatarFallback>
