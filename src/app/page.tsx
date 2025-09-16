@@ -120,7 +120,7 @@ export default async function PublicDashboard() {
               <CardContent>
                 <div className="space-y-4">
                   {memberExpenses.length === 0 ? (
-                       <p className="text-center text-muted-foreground py-10">No members have contributed yet.</p>
+                       <p className="text-center text-muted-foreground py-10">No expenses logged yet.</p>
                   ) : memberExpenses.map(member => (
                     <div key={member.id} className="flex items-center">
                       <Avatar className="h-9 w-9">
@@ -143,7 +143,7 @@ export default async function PublicDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {memberIncomes.length === 0 ? (
+                  {memberIncomes.length === 0 || memberIncomes.every(m => m.total === 0) ? (
                        <p className="text-center text-muted-foreground py-10">No income received yet.</p>
                   ) : memberIncomes.filter(m => m.total > 0).map(member => (
                     <div key={member.id} className="flex items-center">
