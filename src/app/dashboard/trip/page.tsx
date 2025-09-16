@@ -23,6 +23,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Skeleton } from '@/components/ui/skeleton';
 
 const tripDaySchema = z.object({
+  dayName: z.string().min(3, "Day title must be at least 3 characters."),
   date: z.date({
     required_error: "A date is required.",
   }),
@@ -56,18 +57,19 @@ export default function TripPage() {
   
   const form = useForm<z.infer<typeof tripDaySchema>>({
     resolver: zodResolver(tripDaySchema),
-    defaultValues: { places: "", budget: 0, date: undefined },
+    defaultValues: { dayName: "", places: "", budget: 0, date: undefined },
   });
 
    useEffect(() => {
     if (editingTripDay) {
       form.reset({
+        dayName: editingTripDay.dayName,
         date: new Date(editingTripDay.date),
         places: editingTripDay.places,
         budget: editingTripDay.budget,
       });
     } else {
-      form.reset({ places: "", budget: 0, date: undefined });
+      form.reset({ dayName: "", places: "", budget: 0, date: undefined });
     }
   }, [editingTripDay, form]);
 
@@ -110,7 +112,7 @@ export default function TripPage() {
 
   function handleAddClick() {
     setEditingTripDay(null);
-    form.reset({ places: "", budget: 0, date: undefined });
+    form.reset({ dayName: "", places: "", budget: 0, date: undefined });
     setIsDialogOpen(true);
   }
   
@@ -122,6 +124,19 @@ export default function TripPage() {
   const TripDayForm = (
       <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+               <FormField
+                  control={form.control}
+                  name="dayName"
+                  render={({ field }) => (
+                      <FormItem>
+                          <FormLabel>Day Title</FormLabel>
+                          <FormControl>
+                              <Input placeholder="e.g., Day 1: Arrival" {...field} disabled={isSubmitting}/>
+                          </FormControl>
+                          <FormMessage />
+                      </FormItem>
+                  )}
+              />
               <FormField
               control={form.control}
               name="date"
@@ -243,9 +258,9 @@ export default function TripPage() {
                             <TableRow>
                                 <TableCell colSpan={5} className="text-center h-24 text-muted-foreground">No trip days planned yet.</TableCell>
                             </TableRow>
-                        ) : tripDays.map((day, index) => (
+                        ) : tripDays.map((day) => (
                         <TableRow key={day.id}>
-                            <TableCell className="font-semibold">Day {index + 1}</TableCell>
+                            <TableCell className="font-semibold">{day.dayName}</TableCell>
                             <TableCell>{new Date(day.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</TableCell>
                             <TableCell>{day.places}</TableCell>
                             <TableCell>₹{day.budget.toLocaleString()}</TableCell>

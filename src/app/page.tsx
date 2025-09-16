@@ -98,10 +98,10 @@ export default async function PublicDashboard() {
                            <TableRow>
                                 <TableCell colSpan={3} className="text-center h-24 text-muted-foreground">No trip days planned yet.</TableCell>
                             </TableRow>
-                        ) : data.tripDays.map((day, index) => (
+                        ) : data.tripDays.map((day) => (
                         <TableRow key={day.id}>
                             <TableCell>
-                            <div className="font-medium">Day {index + 1}</div>
+                            <div className="font-medium">{day.dayName}</div>
                             <div className="text-sm text-muted-foreground">{new Date(day.date).toLocaleDateString()}</div>
                             </TableCell>
                             <TableCell>{day.places}</TableCell>

@@ -1,7 +1,9 @@
 
 
+
 export interface TripDay {
   id: string;
+  dayName: string;
   date: Date;
   places: string;
   budget: number;
@@ -41,3 +43,4 @@ export interface DashboardData {
     tripDays: TripDay[];
     incomes: Income[];
 }
+
